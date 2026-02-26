@@ -1,0 +1,72 @@
+# NetworkPolicies — restrict traffic to only what's needed
+# Ingress: external → nginx, external → coredns
+# Internal: nginx → doh-backend → coredns
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: coredns-smartdns-netpol
+  namespace: doh-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: coredns-smartdns
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow DNS queries from doh-backend (internal DoH resolution)
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: doh-backend
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    # Allow external DNS queries via NodePort
+    - ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: doh-backend-netpol
+  namespace: doh-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: doh-backend
+  policyTypes:
+    - Ingress
+  ingress:
+    # Only nginx can talk to the DoH backend
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: doh-nginx
+      ports:
+        - port: 8053
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: doh-nginx-netpol
+  namespace: doh-system
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: doh-nginx
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow external HTTPS and HTTP traffic via NodePort
+    - ports:
+        - port: 443
+          protocol: TCP
+        - port: 80
+          protocol: TCP

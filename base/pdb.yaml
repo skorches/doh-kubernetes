@@ -1,0 +1,34 @@
+# PodDisruptionBudgets — ensure at least 1 pod of each service stays running
+# during voluntary disruptions (node drains, upgrades, etc.)
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: coredns-smartdns-pdb
+  namespace: doh-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: coredns-smartdns
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: doh-backend-pdb
+  namespace: doh-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: doh-backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: doh-nginx-pdb
+  namespace: doh-system
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: doh-nginx
