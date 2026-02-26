@@ -1,0 +1,8 @@
+# Environment config (contains VPS_IP)
+.env
+
+# Generated TLS certificates
+ssl/
+
+# Generated ConfigMap (rebuilt by deploy.sh)
+base/configmap-xbox-hosts.yaml
