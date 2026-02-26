@@ -1,0 +1,61 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: coredns-config
+  namespace: doh-system
+  labels:
+    app.kubernetes.io/name: coredns-smartdns
+    app.kubernetes.io/component: dns
+    app.kubernetes.io/part-of: doh-smart-dns
+data:
+  Corefile: |
+    . {
+        # Load custom hosts for Xbox and Discord domains first
+        # CRITICAL: hosts plugin returns immediately (~0ms), no upstream query needed
+        # This ensures NAT domains never expire and never timeout
+        hosts /etc/coredns/xbox-hosts {
+            fallthrough
+            reload 30s
+            ttl 300
+        }
+
+        # Forward non-hosts domains to upstream DNS
+        # policy sequential = try servers in order (Cloudflare first = usually fastest)
+        forward . tls://1.1.1.1 tls://1.0.0.1 tls://8.8.8.8 tls://8.8.4.4 {
+            tls_servername cloudflare-dns.com
+            max_concurrent 1000
+            policy sequential
+            max_fails 2
+            expire 10s
+            health_check 5s
+        }
+
+        # Cache for non-hosts domains
+        # prefetch: refresh popular entries before expiry (0 latency on re-query)
+        cache 3600 {
+            success 3600
+            denial 600
+            prefetch 10 1m 10%
+        }
+
+        # Loop detection — prevent infinite forwarding loops
+        loop
+
+        # Set EDNS0 buffer size (prevents truncation/retries for large responses)
+        bufsize 1232
+
+        # Auto-reload Corefile on changes (works with ConfigMap updates)
+        reload 15s
+
+        # Minimal logging (reduces I/O overhead)
+        errors
+
+        # Health check endpoint
+        health :8080
+
+        # Prometheus metrics (Kubernetes native monitoring)
+        prometheus :9153
+
+        # Readiness probe
+        ready :8181
+    }
