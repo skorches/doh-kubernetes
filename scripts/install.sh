@@ -251,6 +251,7 @@ EOF
     
     print_success "Created .env with VPS_IP=$VPS_IP and DOMAIN=$domain"
     print_info "Tip: Change DOMAIN anytime by editing .env and running: bash scripts/deploy.sh"
+}
 
 # ============================================================================
 # 6. Run deploy.sh
