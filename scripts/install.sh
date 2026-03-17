@@ -204,18 +204,31 @@ setup_kubectl() {
 }
 
 # ============================================================================
-# 5. Create .env with VPS_IP
+# 5. Create .env with VPS_IP and optional DOMAIN
 # ============================================================================
 setup_env_file() {
     print_header "Creating Configuration File"
     
-    cat > "$PROJECT_ROOT/.env" << EOF
+    # Ask for optional domain
+    local domain=""
+    read -rp "Enter your domain name (optional, e.g., doh.example.com): " domain
+    
+    if [ -n "$domain" ]; then
+        cat > "$PROJECT_ROOT/.env" << EOF
+# DoH Kubernetes Configuration
+# Generated: $(date)
+VPS_IP=$VPS_IP
+DOMAIN=$domain
+EOF
+        print_success "Created .env with VPS_IP=$VPS_IP and DOMAIN=$domain"
+    else
+        cat > "$PROJECT_ROOT/.env" << EOF
 # DoH Kubernetes Configuration
 # Generated: $(date)
 VPS_IP=$VPS_IP
 EOF
-    
-    print_success "Created .env with VPS_IP=$VPS_IP"
+        print_success "Created .env with VPS_IP=$VPS_IP"
+    fi
 }
 
 # ============================================================================
@@ -234,16 +247,25 @@ run_deployment() {
 show_completion_info() {
     print_header "Installation Complete!"
     
+    # Read domain from .env if set
+    local access_point="$VPS_IP"
+    if [ -f "$PROJECT_ROOT/.env" ]; then
+        local domain=$(grep '^DOMAIN=' "$PROJECT_ROOT/.env" 2>/dev/null | cut -d'=' -f2 | tr -d ' "'"'"'' || true)
+        if [ -n "$domain" ]; then
+            access_point="$domain"
+        fi
+    fi
+    
     echo ""
-    echo -e "${BOLD}Your DoH Smart DNS is now running on $VPS_IP${NC}"
+    echo -e "${BOLD}Your DoH Smart DNS is now running on $access_point${NC}"
     echo ""
     echo -e "${CYAN}Access Points:${NC}"
-    echo "  DNS (plain):   $VPS_IP:30053"
-    echo "  DoH (HTTPS):   https://$VPS_IP:30443/dns-query"
+    echo "  DNS (plain):   $access_point:30053"
+    echo "  DoH (HTTPS):   https://$access_point:30443/dns-query"
     echo ""
     echo -e "${CYAN}Test Commands:${NC}"
-    echo "  DNS test:  dig @$VPS_IP -p 30053 xboxlive.com"
-    echo "  DoH test:  curl -ks https://$VPS_IP:30443/health"
+    echo "  DNS test:  dig @$access_point -p 30053 xboxlive.com"
+    echo "  DoH test:  curl -ks https://$access_point:30443/health"
     echo ""
     echo -e "${CYAN}Manage Deployment:${NC}"
     echo "  Status:    bash scripts/deploy.sh status"
