@@ -209,14 +209,28 @@ setup_kubectl() {
 setup_env_file() {
     print_header "Creating Configuration File (.env)"
     
-    # Ask for optional domain
+    # Ask for REQUIRED domain
     local domain=""
     echo ""
-    echo -e "${BOLD}Domain Configuration${NC}"
-    echo "Enter a domain name to use HTTPS with proper certificates"
-    echo "(Leave blank to use IP-only — can change anytime later)"
+    echo -e "${BOLD}Domain Configuration (REQUIRED)${NC}"
+    echo "Enter a domain name for DoH endpoint (HTTPS)"
+    echo "Examples: doh.example.com, 440.info, dns.mysite.com"
     echo ""
-    read -rp "Domain name (e.g., doh.example.com or 440.info): " domain
+    
+    # Keep asking until valid domain is entered
+    while [ -z "$domain" ]; do
+        read -rp "Domain name: " domain
+        
+        if [ -z "$domain" ]; then
+            print_error "Domain is required!"
+            echo ""
+        elif ! echo "$domain" | grep -qE '^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$'; then
+            print_error "Invalid domain format: $domain"
+            echo "  Valid examples: doh.example.com, 440.info, dns.local"
+            echo ""
+            domain=""
+        fi
+    done
     
     # Create .env using .env.example as template
     if [ -f "$PROJECT_ROOT/.env.example" ]; then
@@ -235,14 +249,8 @@ NAMESPACE=doh-system
 OVERLAY=base
 EOF
     
-    if [ -n "$domain" ]; then
-        print_success "Created .env with VPS_IP=$VPS_IP and DOMAIN=$domain"
-        print_info "Tip: Change DOMAIN anytime by editing .env and running: bash scripts/deploy.sh"
-    else
-        print_success "Created .env with VPS_IP=$VPS_IP (no domain - IP-only access)"
-        print_info "Tip: Add DOMAIN=your-domain.com to .env anytime and rerun deploy.sh to enable HTTPS"
-    fi
-}
+    print_success "Created .env with VPS_IP=$VPS_IP and DOMAIN=$domain"
+    print_info "Tip: Change DOMAIN anytime by editing .env and running: bash scripts/deploy.sh"
 
 # ============================================================================
 # 6. Run deploy.sh

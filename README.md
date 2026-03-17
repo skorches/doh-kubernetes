@@ -82,22 +82,30 @@ curl -ks https://YOUR_NODE_IP:30443/health
 
 All configuration is stored in `.env` — a **flexible, editable file** you can change anytime.
 
-### .env Settings
+### Required Settings
+
+During `install.sh`, you'll be prompted for:
 
 ```bash
-# Required: Your VPS IP address
+# Your VPS IP address (auto-detected, but you can override)
 VPS_IP=151.241.227.116
 
-# Optional: Your domain (can be changed anytime!)
+# Your domain name (REQUIRED — prompted during installation)
+# Setup will use Let's Encrypt cert if available, 
+# otherwise generate self-signed certificate
 DOMAIN=440.info
-
-# Optional: Deployment size
-OVERLAY=base              # or: production
 ```
 
-### Changing Domain Anytime
+### Optional Settings
 
-The domain is **not locked in** — change it whenever you need:
+```bash
+# Deployment size (default: base)
+OVERLAY=base              # or: production (3 replicas, more resources)
+```
+
+### Changing Configuration Anytime
+
+Domain and other settings can be changed **without reinstalling**:
 
 ```bash
 # 1. Edit .env
@@ -107,19 +115,22 @@ nano .env
 # 2. Re-run deploy.sh (picks up new domain automatically)
 bash scripts/deploy.sh
 
-# That's it! No reinstall needed.
+# Certificate and configuration update automatically
 ```
 
-**Notes:**
-- If using **Let's Encrypt**: Cert must exist in `/etc/letsencrypt/live/your-domain/`
-- If using **self-signed**: Script generates a new cert with the new domain
-- **IP-only mode**: Leave `DOMAIN=` blank to use just the IP address (no domain cert needed)
+### Certificate Handling
+
+During deployment, the setup handles certificates automatically:
+
+- **Let's Encrypt**: If cert exists at `/etc/letsencrypt/live/your-domain/`, it's used
+- **Self-Signed**: If no cert found, one is generated automatically for your domain
+- Valid for: Both the domain name AND your VPS IP address
 
 ## Commands
 
 | Command | Description |
 |---|---|
-| `bash scripts/deploy.sh` | Full install — interactive VPS IP prompt |
+| `bash scripts/install.sh` | Full setup — prompts for IP and domain |
 | `bash scripts/deploy.sh 1.2.3.4` | Full install with VPS IP |
 | `bash scripts/deploy.sh 1.2.3.4 production` | Production install (3 replicas, more resources) |
 | `bash scripts/deploy.sh status` | Show pods, services, and access info |
