@@ -78,6 +78,54 @@ dig @YOUR_NODE_IP -p 30053 xboxlive.com
 curl -ks https://YOUR_NODE_IP:30443/health
 ```
 
+## Configuration
+
+All configuration is stored in `.env` — a **flexible, editable file** you can change anytime.
+
+### .env Settings
+
+```bash
+# Required: Your VPS IP address
+VPS_IP=151.241.227.116
+
+# Optional: Your domain (can be changed anytime!)
+DOMAIN=440.info
+
+# Optional: Deployment size
+OVERLAY=base              # or: production
+```
+
+### Changing Domain Anytime
+
+The domain is **not locked in** — change it whenever you need:
+
+```bash
+# 1. Edit .env
+nano .env
+# Change: DOMAIN=440.info  →  DOMAIN=mynewdomain.com
+
+# 2. Re-run deploy.sh (picks up new domain automatically)
+bash scripts/deploy.sh
+
+# That's it! No reinstall needed.
+```
+
+**Notes:**
+- If using **Let's Encrypt**: Cert must exist in `/etc/letsencrypt/live/your-domain/`
+- If using **self-signed**: Script generates a new cert with the new domain
+- **IP-only mode**: Leave `DOMAIN=` blank to use just the IP address (no domain cert needed)
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `bash scripts/deploy.sh` | Full install — interactive VPS IP prompt |
+| `bash scripts/deploy.sh 1.2.3.4` | Full install with VPS IP |
+| `bash scripts/deploy.sh 1.2.3.4 production` | Production install (3 replicas, more resources) |
+| `bash scripts/deploy.sh status` | Show pods, services, and access info |
+| `bash scripts/deploy.sh destroy` | Delete the entire doh-system namespace |
+| `bash scripts/regenerate-hosts.sh [IP]` | Regenerate hosts and restart CoreDNS (hot reload) |
+
 ## Project Structure
 
 ```
@@ -103,17 +151,6 @@ doh-kubernetes/
     ├── deploy.sh                   # Main deploy/destroy/status script
     └── regenerate-hosts.sh         # Regenerate xbox-hosts ConfigMap
 ```
-
-## Commands
-
-| Command | Description |
-|---|---|
-| `bash scripts/deploy.sh` | Full install — interactive VPS IP prompt |
-| `bash scripts/deploy.sh 1.2.3.4` | Full install with VPS IP |
-| `bash scripts/deploy.sh 1.2.3.4 production` | Production install (3 replicas, more resources) |
-| `bash scripts/deploy.sh status` | Show pods, services, and access info |
-| `bash scripts/deploy.sh destroy` | Delete the entire doh-system namespace |
-| `bash scripts/regenerate-hosts.sh [IP]` | Regenerate hosts and restart CoreDNS (hot reload) |
 
 ## Ports / Services
 

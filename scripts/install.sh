@@ -207,27 +207,40 @@ setup_kubectl() {
 # 5. Create .env with VPS_IP and optional DOMAIN
 # ============================================================================
 setup_env_file() {
-    print_header "Creating Configuration File"
+    print_header "Creating Configuration File (.env)"
     
     # Ask for optional domain
     local domain=""
-    read -rp "Enter your domain name (optional, e.g., doh.example.com): " domain
+    echo ""
+    echo -e "${BOLD}Domain Configuration${NC}"
+    echo "Enter a domain name to use HTTPS with proper certificates"
+    echo "(Leave blank to use IP-only — can change anytime later)"
+    echo ""
+    read -rp "Domain name (e.g., doh.example.com or 440.info): " domain
     
-    if [ -n "$domain" ]; then
-        cat > "$PROJECT_ROOT/.env" << EOF
+    # Create .env using .env.example as template
+    if [ -f "$PROJECT_ROOT/.env.example" ]; then
+        cp "$PROJECT_ROOT/.env.example" "$PROJECT_ROOT/.env"
+    fi
+    
+    # Write configuration
+    cat > "$PROJECT_ROOT/.env" << EOF
 # DoH Kubernetes Configuration
 # Generated: $(date)
+# Note: You can edit this file and run 'bash scripts/deploy.sh' to update config
+
 VPS_IP=$VPS_IP
 DOMAIN=$domain
+NAMESPACE=doh-system
+OVERLAY=base
 EOF
+    
+    if [ -n "$domain" ]; then
         print_success "Created .env with VPS_IP=$VPS_IP and DOMAIN=$domain"
+        print_info "Tip: Change DOMAIN anytime by editing .env and running: bash scripts/deploy.sh"
     else
-        cat > "$PROJECT_ROOT/.env" << EOF
-# DoH Kubernetes Configuration
-# Generated: $(date)
-VPS_IP=$VPS_IP
-EOF
-        print_success "Created .env with VPS_IP=$VPS_IP"
+        print_success "Created .env with VPS_IP=$VPS_IP (no domain - IP-only access)"
+        print_info "Tip: Add DOMAIN=your-domain.com to .env anytime and rerun deploy.sh to enable HTTPS"
     fi
 }
 
