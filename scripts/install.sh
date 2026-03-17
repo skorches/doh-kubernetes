@@ -158,6 +158,19 @@ install_k3s() {
     
     if command -v k3s &>/dev/null; then
         print_success "k3s is already installed: $(k3s --version)"
+        # Still wait for it to be ready
+        print_step "Waiting for k3s cluster to be ready..."
+        for i in {1..30}; do
+            if sudo k3s kubectl get nodes &>/dev/null; then
+                print_success "k3s cluster is ready"
+                return 0
+            fi
+            [ $i -eq 30 ] && {
+                print_warn "k3s cluster status check timed out (may still work)"
+                return 0
+            }
+            sleep 1
+        done
         return 0
     fi
     
@@ -169,7 +182,7 @@ install_k3s() {
     for i in {1..30}; do
         if sudo k3s kubectl get nodes &>/dev/null; then
             print_success "k3s is ready"
-            break
+            return 0
         fi
         [ $i -eq 30 ] && {
             print_error "k3s failed to start"
@@ -188,19 +201,51 @@ setup_kubectl() {
     # Create .kube directory
     mkdir -p ~/.kube
     
-    # Copy k3s kubeconfig
-    print_step "Configuring kubectl..."
-    sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
-    sudo chown $(id -u):$(id -g) ~/.kube/config
-    chmod 600 ~/.kube/config
+    # Wait for k3s kubeconfig to be ready
+    print_step "Waiting for kubeconfig file..."
+    local config_path="/etc/rancher/k3s/k3s.yaml"
+    local max_attempts=30
+    local attempts=0
     
-    # Verify kubectl works
-    if kubectl cluster-info &>/dev/null; then
-        print_success "kubectl is configured and working"
+    while [ ! -f "$config_path" ]; do
+        ((attempts++))
+        if [ $attempts -eq $max_attempts ]; then
+            print_error "kubeconfig not found at $config_path"
+            echo "  Try: sudo ls -la /etc/rancher/k3s/"
+            exit 1
+        fi
+        sleep 1
+    done
+    
+    # Copy k3s kubeconfig with proper permissions
+    print_step "Configuring kubectl..."
+    
+    # Try with sudo first, then fallback
+    if sudo cp "$config_path" ~/.kube/config 2>/dev/null; then
+        sudo chown $(id -u):$(id -g) ~/.kube/config
+        chmod 600 ~/.kube/config
     else
-        print_error "kubectl configuration failed"
+        print_error "Failed to copy kubeconfig from $config_path"
+        echo "  Try: sudo cat $config_path > ~/.kube/config"
         exit 1
     fi
+    
+    # Verify kubectl can access cluster
+    print_step "Verifying kubectl access..."
+    local verify_attempts=0
+    while [ $verify_attempts -lt 10 ]; do
+        if kubectl cluster-info &>/dev/null; then
+            print_success "kubectl is configured and working"
+            return 0
+        fi
+        ((verify_attempts++))
+        sleep 1
+    done
+    
+    print_error "kubectl configuration failed — cluster not accessible"
+    echo "  Check: kubectl cluster-info"
+    echo "  Check: echo \$KUBECONFIG"
+    exit 1
 }
 
 # ============================================================================
