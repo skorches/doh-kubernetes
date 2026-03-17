@@ -213,33 +213,87 @@ EOF
 # ======================================================
 # 4. TLS certificates — find existing or generate self-signed
 # ======================================================
+verify_cert_key_match() {
+    local cert_path="$1"
+    local key_path="$2"
+
+    if [ ! -f "$cert_path" ] || [ ! -f "$key_path" ]; then
+        return 1
+    fi
+
+    if ! command -v openssl &>/dev/null; then
+        print_warning "openssl not available to verify cert/key match"
+        return 0  # Assume they match if we can't verify
+    fi
+
+    # Extract public key from cert and key file, then compare
+    local cert_modulus key_modulus
+    cert_modulus=$(openssl x509 -noout -modulus -in "$cert_path" 2>/dev/null | sort)
+    key_modulus=$(openssl rsa -noout -modulus -in "$key_path" 2>/dev/null | sort)
+
+    if [ "$cert_modulus" = "$key_modulus" ]; then
+        return 0  # Match
+    else
+        return 1  # No match
+    fi
+}
+
 setup_tls() {
     print_header "TLS Certificate Setup"
 
     local cert_path=""
     local key_path=""
 
-    # Search common locations for real certs
-    for cert_dir in \
-        /etc/letsencrypt/live \
-        "${PROJECT_ROOT}/ssl" \
-        "${PROJECT_ROOT}/certs" \
-        "${PROJECT_ROOT}/tls"; do
-        if [ -d "$cert_dir" ]; then
-            local found_cert found_key
-            found_cert=$(find "$cert_dir" -name "fullchain.pem" -o -name "tls.crt" -o -name "cert.pem" 2>/dev/null | head -1)
-            found_key=$(find "$cert_dir" -name "privkey.pem" -o -name "tls.key" -o -name "key.pem" 2>/dev/null | head -1)
-            if [ -n "$found_cert" ] && [ -n "$found_key" ]; then
-                cert_path="$found_cert"
-                key_path="$found_key"
-                break
-            fi
-        fi
-    done
+    # Get domain for certificate lookup
+    local domain="${DOMAIN:-}"
+    if [ -z "$domain" ] && [ -f "$PROJECT_ROOT/.env" ]; then
+        domain=$(grep '^DOMAIN=' "$PROJECT_ROOT/.env" 2>/dev/null | cut -d'=' -f2 | tr -d ' "'"'"'' || true)
+    fi
 
+    # If domain is set, prioritize searching in Let's Encrypt domain directory
+    if [ -n "$domain" ] && [ -d "/etc/letsencrypt/live/$domain" ]; then
+        print_info "Searching for certs in domain directory: /etc/letsencrypt/live/$domain"
+        cert_path=$(find "/etc/letsencrypt/live/$domain" -maxdepth 1 -name "fullchain.pem" 2>/dev/null | head -1)
+        key_path=$(find "/etc/letsencrypt/live/$domain" -maxdepth 1 -name "privkey.pem" 2>/dev/null | head -1)
+    fi
+
+    # If not found with domain-specific search, try other standard locations
+    if [ -z "$cert_path" ] || [ -z "$key_path" ]; then
+        for cert_dir in \
+            /etc/letsencrypt/live \
+            "${PROJECT_ROOT}/ssl" \
+            "${PROJECT_ROOT}/certs" \
+            "${PROJECT_ROOT}/tls"; do
+            if [ -d "$cert_dir" ]; then
+                local found_cert found_key
+                # For /etc/letsencrypt/live, search only in subdirectories (one per domain)
+                if [ "$cert_dir" = "/etc/letsencrypt/live" ]; then
+                    found_cert=$(find "$cert_dir" -maxdepth 2 -name "fullchain.pem" 2>/dev/null | head -1)
+                    found_key=$(find "$cert_dir" -maxdepth 2 -name "privkey.pem" 2>/dev/null | head -1)
+                else
+                    found_cert=$(find "$cert_dir" -name "fullchain.pem" -o -name "tls.crt" -o -name "cert.pem" 2>/dev/null | head -1)
+                    found_key=$(find "$cert_dir" -name "privkey.pem" -o -name "tls.key" -o -name "key.pem" 2>/dev/null | head -1)
+                fi
+                if [ -n "$found_cert" ] && [ -n "$found_key" ]; then
+                    cert_path="$found_cert"
+                    key_path="$found_key"
+                    break
+                fi
+            fi
+        done
+    fi
+
+    # Verify cert and key match
     if [ -n "$cert_path" ] && [ -n "$key_path" ]; then
-        print_info "Found existing cert: $cert_path"
-        print_info "Found existing key:  $key_path"
+        if ! verify_cert_key_match "$cert_path" "$key_path"; then
+            print_warning "Certificate and key don't match. Generating self-signed cert..."
+            generate_self_signed_cert
+            cert_path="$PROJECT_ROOT/ssl/tls.crt"
+            key_path="$PROJECT_ROOT/ssl/tls.key"
+        else
+            print_info "Found existing cert: $cert_path"
+            print_info "Found existing key:  $key_path"
+        fi
     else
         # Generate self-signed certificate
         print_info "No TLS certificates found — generating self-signed cert..."
