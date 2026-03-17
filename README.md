@@ -36,32 +36,29 @@ DNS-over-HTTPS smart DNS proxy for Xbox, Discord, and gaming platforms, deployed
 ### Prerequisites
 
 - A Kubernetes cluster (k3s, minikube, kubeadm, etc.)
-- `kubectl` configured and connected to the cluster (auto-installed if missing)
+- `kubectl` configured and connected to the cluster
 - Your VPS/node public IP address
+- TLS certificates (optional, for DoH HTTPS)
 
-### One-Command Install
+### 1. Clone and configure
 
 ```bash
-# Just run it — prompts for your VPS IP interactively
-bash scripts/deploy.sh
-
-# Or pass your IP directly
-bash scripts/deploy.sh 1.2.3.4
-
-# Production overlay (3 replicas, higher resources)
-bash scripts/deploy.sh 1.2.3.4 production
+cd doh-kubernetes
+cp .env.example .env
+# Edit .env — set your VPS_IP and DOMAIN
 ```
 
-The script handles **everything** automatically:
-- Installs `kubectl` if not found
-- Generates the xbox-hosts ConfigMap from template
-- Generates self-signed TLS certificates (or uses existing ones from `ssl/` or Let's Encrypt)
-- Deploys all Kubernetes resources
-- Waits for rollouts to complete
-- Runs DNS and DoH health checks
-- Saves your VPS_IP to `.env` for next time
+### 2. Deploy
 
-### Verify
+```bash
+# Basic deployment (2 replicas each)
+VPS_IP=YOUR_IP bash scripts/deploy.sh deploy
+
+# Production deployment (3 replicas, higher resource limits)
+VPS_IP=YOUR_IP bash scripts/deploy.sh deploy production
+```
+
+### 3. Verify
 
 ```bash
 # Check status
@@ -104,12 +101,12 @@ doh-kubernetes/
 
 | Command | Description |
 |---|---|
-| `bash scripts/deploy.sh` | Full install — interactive VPS IP prompt |
-| `bash scripts/deploy.sh 1.2.3.4` | Full install with VPS IP |
-| `bash scripts/deploy.sh 1.2.3.4 production` | Production install (3 replicas, more resources) |
-| `bash scripts/deploy.sh status` | Show pods, services, and access info |
-| `bash scripts/deploy.sh destroy` | Delete the entire doh-system namespace |
-| `bash scripts/regenerate-hosts.sh [IP]` | Regenerate hosts and restart CoreDNS (hot reload) |
+| `scripts/deploy.sh deploy` | Deploy with base config (2 replicas) |
+| `scripts/deploy.sh deploy production` | Deploy with production overlay (3 replicas) |
+| `scripts/deploy.sh status` | Show pods, services, and access info |
+| `scripts/deploy.sh destroy` | Delete the entire doh-system namespace |
+| `scripts/deploy.sh generate` | Generate xbox-hosts ConfigMap without applying |
+| `scripts/regenerate-hosts.sh [IP]` | Regenerate hosts and restart CoreDNS |
 
 ## Ports / Services
 
@@ -124,12 +121,7 @@ doh-kubernetes/
 
 ## TLS Certificates
 
-The deploy script **automatically generates self-signed TLS certificates** if none are found.
-For production, you can replace them:
-
-### Option A: Provide your own certificates
-
-Place `tls.crt` and `tls.key` in the `ssl/` directory before running `deploy.sh`, or:
+### Option A: Manual certificates
 
 ```bash
 kubectl create secret tls doh-tls-certs \
@@ -249,6 +241,6 @@ sudo k3s kubectl get nodes
 # Use k3s kubectl or copy kubeconfig
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
 
-# Now deploy — just one command
-bash scripts/deploy.sh $(curl -s ifconfig.me)
+# Now deploy
+VPS_IP=$(curl -s ifconfig.me) bash scripts/deploy.sh deploy
 ```

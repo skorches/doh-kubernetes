@@ -24,19 +24,9 @@ spec:
         app.kubernetes.io/component: proxy
         app.kubernetes.io/part-of: doh-smart-dns
     spec:
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app.kubernetes.io/name: doh-nginx
-                topologyKey: kubernetes.io/hostname
-      terminationGracePeriodSeconds: 30
       containers:
         - name: nginx
-          image: nginx:1.27-alpine
+          image: nginx:alpine
           ports:
             - containerPort: 80
               name: http
@@ -62,15 +52,6 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 2
-          securityContext:
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-              add: ["NET_BIND_SERVICE"]
-          lifecycle:
-            preStop:
-              exec:
-                command: ["/bin/sh", "-c", "sleep 5 && nginx -s quit"]
           resources:
             requests:
               cpu: 50m
@@ -85,12 +66,6 @@ spec:
             - name: tls-certs
               mountPath: /etc/nginx/ssl
               readOnly: true
-            - name: tmp
-              mountPath: /tmp
-            - name: run
-              mountPath: /var/run
-            - name: cache
-              mountPath: /var/cache/nginx
       volumes:
         - name: nginx-config
           configMap:
@@ -98,12 +73,6 @@ spec:
         - name: tls-certs
           secret:
             secretName: doh-tls-certs
-        - name: tmp
-          emptyDir: {}
-        - name: run
-          emptyDir: {}
-        - name: cache
-          emptyDir: {}
       restartPolicy: Always
 ---
 apiVersion: v1

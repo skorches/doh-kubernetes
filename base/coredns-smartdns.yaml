@@ -24,24 +24,12 @@ spec:
         app.kubernetes.io/component: dns
         app.kubernetes.io/part-of: doh-smart-dns
       annotations:
-        # Updated by deploy.sh — triggers rolling restart on config changes
+        # Force pod restart when ConfigMap changes
         checksum/config: "PLACEHOLDER"
     spec:
-      # Spread replicas across different nodes when possible
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app.kubernetes.io/name: coredns-smartdns
-                topologyKey: kubernetes.io/hostname
-      # Allow in-flight DNS queries to finish before termination
-      terminationGracePeriodSeconds: 30
       containers:
         - name: coredns
-          image: coredns/coredns:1.12.0
+          image: coredns/coredns:latest
           args:
             - "-conf"
             - "/etc/coredns/Corefile"
@@ -77,15 +65,6 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 2
-          securityContext:
-            runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
-              add: ["NET_BIND_SERVICE"]
           resources:
             requests:
               cpu: 100m

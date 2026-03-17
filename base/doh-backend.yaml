@@ -24,19 +24,9 @@ spec:
         app.kubernetes.io/component: doh-server
         app.kubernetes.io/part-of: doh-smart-dns
     spec:
-      affinity:
-        podAntiAffinity:
-          preferredDuringSchedulingIgnoredDuringExecution:
-            - weight: 100
-              podAffinityTerm:
-                labelSelector:
-                  matchLabels:
-                    app.kubernetes.io/name: doh-backend
-                topologyKey: kubernetes.io/hostname
-      terminationGracePeriodSeconds: 30
       containers:
         - name: doh-server
-          image: satishweb/doh-server:v2.3.5
+          image: satishweb/doh-server:latest
           env:
             - name: UPSTREAM_DNS_SERVER
               value: "udp:coredns-smartdns.doh-system.svc.cluster.local:53"
@@ -66,12 +56,6 @@ spec:
             periodSeconds: 5
             timeoutSeconds: 2
             failureThreshold: 2
-          securityContext:
-            runAsNonRoot: true
-            readOnlyRootFilesystem: true
-            allowPrivilegeEscalation: false
-            capabilities:
-              drop: ["ALL"]
           resources:
             requests:
               cpu: 50m

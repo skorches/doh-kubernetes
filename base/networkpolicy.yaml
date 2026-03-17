@@ -1,6 +1,7 @@
 # NetworkPolicies — restrict traffic to only what's needed
 # Ingress: external → nginx, external → coredns
 # Internal: nginx → doh-backend → coredns
+# Egress: pods can reach their dependencies and upstream DNS
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -13,6 +14,7 @@ spec:
       app.kubernetes.io/name: coredns-smartdns
   policyTypes:
     - Ingress
+    - Egress
   ingress:
     # Allow DNS queries from doh-backend (internal DoH resolution)
     - from:
@@ -30,6 +32,25 @@ spec:
           protocol: UDP
         - port: 53
           protocol: TCP
+  egress:
+    # Allow DNS queries to upstream servers (1.1.1.1, 8.8.8.8)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+        - port: 853
+          protocol: TCP
+    # Allow OCSP stapling / cert verification (TLS to upstream)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
+          protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -42,6 +63,7 @@ spec:
       app.kubernetes.io/name: doh-backend
   policyTypes:
     - Ingress
+    - Egress
   ingress:
     # Only nginx can talk to the DoH backend
     - from:
@@ -50,6 +72,17 @@ spec:
               app.kubernetes.io/name: doh-nginx
       ports:
         - port: 8053
+          protocol: TCP
+  egress:
+    # Allow DNS queries to coredns-smartdns
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: coredns-smartdns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
           protocol: TCP
 ---
 apiVersion: networking.k8s.io/v1
@@ -63,10 +96,27 @@ spec:
       app.kubernetes.io/name: doh-nginx
   policyTypes:
     - Ingress
+    - Egress
   ingress:
     # Allow external HTTPS and HTTP traffic via NodePort
     - ports:
         - port: 443
           protocol: TCP
         - port: 80
+          protocol: TCP
+  egress:
+    # Allow connection to doh-backend on port 8053
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: doh-backend
+      ports:
+        - port: 8053
+          protocol: TCP
+    # Allow external HTTPS (for any future dependencies like cert validation)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - port: 443
           protocol: TCP

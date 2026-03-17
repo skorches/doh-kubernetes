@@ -10,7 +10,6 @@ resources:
   - coredns-smartdns.yaml
   - doh-backend.yaml
   - doh-nginx.yaml
-  - networkpolicy.yaml
   - pdb.yaml
 
 commonLabels:
